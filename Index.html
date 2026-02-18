@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AWA Calculator</title>
+  <!-- viewport already includes all needed; we keep original + add orientation handling in JS -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="J111 polar-based Apparent Wind Angle calculator for Tasman routes">
+  
+  <!-- iOS PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AWA Calculator">
+  <link rel="apple-touch-icon" href="icon-192x192.png">
+  
+  <!-- Android PWA Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192x192.png">
+
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      margin:0; 
+      background:#0f172a; 
+      color:#e5e7eb; 
+      font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    header { 
+      padding:20px; 
+      border-bottom:1px solid #1f2937; 
+      position: sticky;
+      top: 0;
+      background: #0f172a;
+      z-index: 10;
+    }
+    header h1 { margin:0 0 6px 0; font-size:1.6rem; }
+    header p { margin:0; color:#9ca3af; font-size: 0.9rem; }
+    main { padding:20px; display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    section { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:16px; }
+    h2 { margin:0 0 10px 0; font-size:1.1rem; }
+    label { display:block; margin:10px 0 6px; color:#9ca3af; font-size:0.9rem; }
+    input, select { 
+      width:100%; 
+      padding:12px; 
+      border-radius:8px; 
+      border:1px solid #374151; 
+      background:#0b1220; 
+      color:#e5e7eb; 
+      font-size: 16px;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .btn { 
+      margin-top:12px; 
+      padding:12px; 
+      border-radius:8px; 
+      border:1px solid #334155; 
+      background:#0b1220; 
+      color:#e5e7eb; 
+      cursor:pointer; 
+      width: 100%;
+      font-size: 16px;
+    }
+    .btn:hover, .btn:active { border-color:#475569; background:#1e293b; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .card { background:#0b1220; border:1px solid #1f2937; border-radius:8px; padding:10px; }
+    .kpi { font-size:1.4rem; }
+    .muted { color:#9ca3af; font-size:0.9rem; }
+    .accent { color:#38bdf8; }
+    .success { color:#10b981; }
+    .warning { color:#f59e0b; }
+    .error { color:#ef4444; }
+    .pill { display:inline-block; padding:2px 8px; border:1px solid #374151; border-radius:999px; font-size: 0.8rem; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th, td { border-bottom:1px solid #1f2937; padding:6px; text-align:left; font-size:0.9rem; }
+    footer { padding:14px 20px; color:#9ca3af; border-top:1px solid #1f2937; font-size:0.85rem; }
+    
+    /* Sail recommendations */
+    .sail-perfect { border-left: 4px solid #10b981; }
+    .sail-partial { border-left: 4px solid #f59e0b; }
+    
+    /* Course feasibility */
+    .course-good { border-left: 4px solid #10b981; }
+    .course-warning { border-left: 4px solid #f59e0b; }
+    .course-error { border-left: 4px solid #ef4444; }
+    
+    /* Install Prompt */
+    #installPrompt {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      z-index: 1000;
+      max-width: 400px;
+      width: 90%;
+      display: none;
+    }
+    #installPrompt button {
+      margin: 5px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background: #0b1220;
+      color: #e5e7eb;
+      cursor: pointer;
+    }
+    #installPrompt button.primary {
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+    }
+    
+    /* Mobile-friendly tweaks – keep original; we will also adjust via JS on rotate if needed, but CSS covers portrait/landscape */
+    @media (max-width: 768px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 15px;
+        gap: 12px;
+      }
+      .row {
+        grid-template-columns: 1fr;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .card {
+        font-size: 1rem;
+        padding: 12px;
+      }
+      input, select, .btn {
+        font-size: 16px;
+        padding: 12px;
+      }
+      header h1 {
+        font-size: 1.3rem;
+      }
+      header {
+        padding: 15px;
+      }
+      section {
+        padding: 12px;
+      }
+      select {
+        background:#111827;
+        color:#e5e7eb;
+        font-size: 16px;
+        padding: 12px;
+      }
+    }
+    /* Additional small screen / landscape adjustments - fine tune with JS but base fine */
+    @media (max-width: 480px) and (orientation: landscape) {
+      /* landscape on small phones: allow more horizontal space */
+      header h1 { font-size: 1.2rem; }
+      .kpi { font-size: 1.2rem; }
+      .grid { gap: 6px; }
+      .card { padding: 8px; }
+    }
+    
+    /* Focus styles for better accessibility */
+    input:focus, select:focus, .btn:focus {
+      outline: 2px solid #38bdf8;
+      outline-offset: 2px;
+    }
+    
+    /* Loading state */
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+      <header>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <img src="logo.png" alt="AWA Calculator Logo" style="height: 27px; width: auto;" />
+      <div>
+        <h1>Apparent Wind Angle Calculator</h1>
+        <p>J111 polar-based AWA for selected Tasman routes. Enter TWD and TWS, then calculate.</p>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section>
+      <h2>Inputs</h2>
+      
+      <!-- Route Selection Method -->
+      <label for="routeMethod">Route input method</label>
+      <select id="routeMethod">
+        <option value="predefined">Select predefined route</option>
+        <option value="custom">Enter custom bearing</option>
+      </select>
+
+      <!-- Predefined Route Selection (shown by default) -->
+      <div id="predefinedRouteSection">
+        <label for="route">Route leg</label>
+        <select id="route"></select>
+      </div>
+
+      <!-- Custom Bearing Input (hidden by default) -->
+      <div id="customRouteSection" style="display: none;">
+        <label for="customBearing">Course bearing (deg true)</label>
+        <input id="customBearing" type="number" min="0" max="360" step="0.1" placeholder="e.g., 275" inputmode="decimal" />
+        
+        <label for="customDistance">Distance (NM) - for reference only</label>
+        <input id="customDistance" type="number" min="0" step="0.1" placeholder="e.g., 5.5" inputmode="decimal" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="twd">True wind direction (deg true, FROM)</label>
+          <input id="twd" type="number" min="0" max="360" step="0.1" placeholder="e.g., 240" inputmode="decimal" />
+        </div>
+        <div>
+          <label for="tws">True wind speed (kn)</label>
+          <input id="tws" type="number" min="0" step="0.1" placeholder="e.g., 12" inputmode="decimal" />
+        </div>
+      </div>
+
+      <button class="btn" id="calc">Calculate</button>
+      <p id="note" class="muted"></p>
+    </section>
+
+    <section>
+      <h2>Results</h2>
+      <div class="grid">
+        <div class="card"><div class="muted">Course bearing</div><div id="outBearing" class="kpi">—</div></div>
+        <div class="card"><div class="muted">True wind angle (relative)</div><div id="outTWA" class="kpi">—</div><div id="outTWASide" class="pill">—</div></div>
+        <div class="card"><div class="muted">Boat speed (kn, polar)</div><div id="outBSpd" class="kpi">—</div></div>
+        <div class="card"><div class="muted">Apparent wind angle</div><div id="outAWA" class="kpi accent">—</div><div id="outAWASide" class="pill">—</div></div>
+        <div class="card"><div class="muted">Apparent wind speed (kn)</div><div id="outAWS" class="kpi">—</div></div>
+        <div class="card"><div class="muted">Apparent wind direction (FROM)</div><div id="outAWD" class="kpi">—</div></div>
+      </div>
+
+      <table>
+        <thead><tr><th>Key</th><th>Value</th></tr></thead>
+        <tbody id="details">
+          <tr><td>Start</td><td id="dStart">—</td></tr>
+          <tr><td>End</td><td id="dEnd">—</td></tr>
+          <tr><td>Distance (NM)</td><td id="dDist">—</td></tr>
+          <tr><td>TWD (deg)</td><td id="dTWD">—</td></tr>
+          <tr><td>TWS (kn)</td><td id="dTWS">—</td></tr>
+          <tr><td>Interpolated TWS bracketing</td><td id="dBracket">—</td></tr>
+          <tr><td>Angle grid used</td><td id="dAngles">—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Sail Recommendations</h2>
+      <div id="sailRecommendations">
+        <div class="muted">Calculate to see sail recommendations</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Course Feasibility</h2>
+      <div id="feasibilityResults">
+        <div class="muted">Calculate to see course analysis</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Install Prompt -->
+  <div id="installPrompt">
+    <p>Install AWA Calculator for a better experience?</p>
+    <button id="installCancel">Not Now</button>
+    <button id="installAccept" class="primary">Install</button>
+  </div>
+
+  <footer>
+    Apparent wind vector = True wind (TO) − Boat velocity (TO).  
+    Apparent wind direction (FROM) = apparent TO + 180°.  
+    AWA = signed difference between AWD_from and course heading.
+  </footer>
+
+  <script>
+    // ========================
+    // SCREEN ROTATION HANDLER - FIXED FOR PWA INSTALLED MODE
+    // ========================
+    function handleScreenOrientation() {
+      // Force repaint for PWA installed mode
+      document.body.style.transform = 'translateZ(0)';
+      
+      // Small delay to allow CSS to apply
+      setTimeout(() => {
+        document.body.style.transform = '';
+        
+        // Force any viewport-constrained elements to recalc
+        const main = document.querySelector('main');
+        if (main) {
+          main.style.display = 'none';
+          main.style.display = 'grid';
+        }
+      }, 20);
+      
+      if (screen.orientation) {
+        console.log(`Orientation: ${screen.orientation.type}`);
+      }
+    }
+
+    // Listen to orientation changes - FIXED FOR PWA
+    function setupOrientationHandlers() {
+      // Method 1: screen.orientation API (works in some PWAs)
+      if (window.screen && screen.orientation) {
+        try {
+          screen.orientation.addEventListener('change', function() {
+            handleScreenOrientation();
+          });
+        } catch(e) {
+          console.log('screen.orientation event listener failed', e);
+        }
+      }
+      
+      // Method 2: orientationchange event (works in most PWAs)
+      window.addEventListener('orientationchange', function() {
+        // Small delay for orientation to complete
+        setTimeout(handleScreenOrientation, 50);
+      });
+      
+      // Method 3: resize with dimension comparison (always works)
+      let lastWidth = window.innerWidth;
+      let lastHeight = window.innerHeight;
+      
+      window.addEventListener('resize', function() {
+        // Check if dimensions significantly changed (orientation likely)
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const widthChanged = Math.abs(width - lastWidth) > 100;
+        const heightChanged = Math.abs(height - lastHeight) > 100;
+        const aspectRatioChanged = (width/height) !== (lastWidth/lastHeight);
+        
+        if (widthChanged || heightChanged || aspectRatioChanged) {
+          handleScreenOrientation();
+        }
+        
+        lastWidth = width;
+        lastHeight = height;
+      });
+    }
+
+    // Also call once at load
+    window.addEventListener('DOMContentLoaded', function() {
+      handleScreenOrientation();
+      setupOrientationHandlers();
+    });
+
+    // ========================
+    // PWA Installation Handling (unchanged)
+    // ========================
+    let deferredPrompt;
+    const installPrompt = document.getElementById('installPrompt');
+    const installAccept = document.getElementById('installAccept');
+    const installCancel = document.getElementById('installCancel');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      
+      setTimeout(() => {
+        installPrompt.style.display = 'block';
+      }, 3000);
+    });
+
+    installAccept.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      
+      deferredPrompt = null;
+      installPrompt.style.display = 'none';
+    });
+
+    installCancel.addEventListener('click', () => {
+      installPrompt.style.display = 'none';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA was installed');
+      installPrompt.style.display = 'none';
+      deferredPrompt = null;
+    });
+
+    // ----- Your existing application code, unchanged from original -----
+    document.addEventListener('DOMContentLoaded', function() {
+      // --- ROUTES (full set, Pile 1 removed) ---
+      const routes = [
+        {start:"Boulder North", latStart:-41.2368, lonStart:173.2855833,
+         end:"North Cardinal", latEnd:-41.2333333, lonEnd:173.2366667,
+         bearing:275, dist:2.22},
+		{start:"Boulder North", latStart:-41.2368, lonStart:173.28558333333331, end:"Pile One", latEnd:-41.26216666666667, lonEnd:173.2575, bearing:220, dist:1.98},
+		{start:"Boulder Centre", latStart:-41.24425, lonStart:173.27555, end:"North Cardinal", latEnd:-41.23333333333333, lonEnd:173.23666666666668, bearing:290, dist:1.87},
+        {start:"Boulder South", latStart:-41.2500667, lonStart:173.2676167,
+         end:"North Cardinal", latEnd:-41.2333333, lonEnd:173.2366667,
+         bearing:306, dist:1.72},
+        {start:"Boulder South", latStart:-41.2500667, lonStart:173.2676167,
+         end:"Mapua", latEnd:-41.2398333, lonEnd:173.1245,
+         bearing:275, dist:6.49},
+        {start:"Glen Outer Mark", latStart:-41.1716667, lonStart:173.3488833,
+         end:"Mapua", latEnd:-41.2398333, lonEnd:173.1245,
+         bearing:248, dist:10.93},
+        {start:"Mapua", latStart:-41.2398333, lonStart:173.1245,
+         end:"North Cardinal", latEnd:-41.2333333, lonEnd:173.2366667,
+         bearing:86, dist:5.08},
+        {start:"Mapua", latStart:-41.2398333, lonStart:173.1245,
+         end:"Pile Zero", latEnd:-41.2573333, lonEnd:173.253,
+         bearing:100, dist:5.9},
+        {start:"North Cardinal", latStart:-41.2333333, lonStart:173.2366667,
+         end:"Pile One", latEnd:-41.2621667, lonEnd:173.2575,
+         bearing:153, dist:2.0},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Fisherman Island", latEnd:-40.9883333, lonEnd:173.0511667,
+         bearing:330, dist:18.55},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Adele Island", latEnd:-40.9883333, lonEnd:173.0511667,
+         bearing:330, dist:18.55},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Tonga Island", latEnd:-40.886, lonEnd:173.0706667,
+         bearing:340, dist:23.77},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Glen Outer Mark", latEnd:-41.1716667, lonEnd:173.3488833,
+         bearing:40, dist:6.72},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Boulder North", latEnd:-41.2368, lonEnd:173.2855833,
+         bearing:50, dist:1.92},
+        {start:"Pile One", latStart:-41.2621667, lonStart:173.2575,
+         end:"North Cardinal", latEnd:-41.2333333, lonEnd:173.2366667,
+         bearing:331, dist:1.97},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Awaroa Heads", latEnd:-40.8476667, lonEnd:173.0560833,
+         bearing:340, dist:26.16},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Seperation Point", latEnd:-40.7825, lonEnd:173.9988333,
+         bearing:50, dist:44.21},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Marine Farm S Cardinal", latEnd:-41.0934167, lonEnd:173.0985833,
+         bearing:325, dist:12.06},
+        {start:"Pile Zero", latStart:-41.2573333, lonStart:173.253,
+         end:"Marine Farm E Cardinal", latEnd:-41.0758167, lonEnd:173.1372333,
+         bearing:334, dist:12.09},
+        {start:"Adele Island", latStart:-40.9883333, lonStart:173.0511667,
+         end:"Marine Farm N Cardinal", latEnd:-41.0553, lonEnd:173.1201667,
+         bearing:142, dist:5.09},
+        {start:"Tonga Island", latStart:-40.886, lonStart:173.0706667,
+         end:"Marine Farm N Cardinal", latEnd:-41.0553, lonEnd:173.1201667,
+         bearing:168, dist:10.41},
+        {start:"Tonga Island", latStart:-40.886, lonStart:173.0706667,
+         end:"Marine Farm E Cardinal", latEnd:-41.0758167, lonEnd:173.1372333,
+         bearing:165, dist:11.79},
+      ];
+
+      // --- CORRECTED POLAR DATA ---
+      const polars = {
+        6: {
+          angles: [44.5, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [5.15, 5.66, 5.99, 6.20, 6.24, 6.25, 6.49, 6.43, 6.19, 5.62, 4.37, 3.55, 3.29]
+        },
+        8: {
+          angles: [41.1, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [5.99, 6.77, 7.09, 7.27, 7.30, 7.29, 7.57, 7.63, 7.53, 6.85, 5.70, 4.69, 4.38]
+        },
+        10: {
+          angles: [40.6, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [6.64, 7.43, 7.74, 7.93, 7.95, 7.94, 7.92, 8.35, 8.41, 7.76, 6.78, 5.80, 5.45]
+        },
+        12: {
+          angles: [39.0, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [6.89, 7.70, 8.01, 8.31, 8.43, 8.47, 8.35, 8.86, 9.11, 8.43, 7.56, 6.71, 6.35]
+        },
+        14: {
+          angles: [38.2, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [7.06, 7.87, 8.18, 8.50, 8.65, 8.79, 8.87, 9.26, 9.49, 9.11, 8.14, 7.46, 7.15]
+        },
+        16: {
+          angles: [37.5, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [7.10, 7.98, 8.29, 8.63, 8.80, 8.96, 9.27, 9.57, 9.88, 9.95, 8.70, 8.04, 7.77]
+        },
+        20: {
+          angles: [38.3, 52, 60, 70, 75, 80, 90, 110, 120, 135, 150, 165, 180],
+          speeds: [7.10, 7.97, 8.33, 8.76, 8.97, 9.17, 9.60, 10.11, 10.68, 11.93, 10.10, 9.14, 8.82]
+        }
+      };
+      
+      const twsGrid = Object.keys(polars).map(Number).sort((a, b) => a - b);
+
+ // --- POLYGON-BASED SAIL BOUNDARY DATA ---
+const sailPolygons = {
+  "C0": [
+    { tws: 5, awa: 32 },
+    { tws: 8, awa: 40 },
+    { tws: 12, awa: 50 },
+    { tws: 13.5, awa: 60 },
+    { tws: 15, awa: 65 },
+    { tws: 16, awa: 70 },
+    { tws: 15, awa: 75 },
+    { tws: 12, awa: 70 },
+    { tws: 10, awa: 65 },
+    { tws: 7, awa: 60 },
+    { tws: 6, awa: 50 },
+    { tws: 5, awa: 40 }
+  ],
+  
+  "A1.5": [
+    { tws: 8, awa: 61 },
+    { tws: 8, awa: 80 },
+    { tws: 8.5, awa: 90 },
+    { tws: 9, awa: 100 },
+    { tws: 10, awa: 110 },
+    { tws: 11, awa: 120 },
+    { tws: 12.5, awa: 130 },
+    { tws: 16.5, awa: 137 },
+    { tws: 17, awa: 130 },
+    { tws: 17, awa: 90 },
+    { tws: 16, awa: 80 },
+    { tws: 13, awa: 70 }
+  ],
+  
+  "A2": [
+    { tws: 15, awa: 80 },
+    { tws: 14.5, awa: 83 },
+    { tws: 15, awa: 90 },
+    { tws: 16, awa: 100 },
+    { tws: 16, awa: 110 },
+    { tws: 16.5, awa: 120 },
+    { tws: 17, awa: 130 },
+    { tws: 17.5, awa: 140 },
+    { tws: 22.5, awa: 150 },
+    { tws: 25, awa: 148 },
+    { tws: 25, awa: 140 },
+    { tws: 23.5, awa: 130 },
+    { tws: 23, awa: 120 },
+    { tws: 23, awa: 110 },
+    { tws: 23, awa: 100 },
+    { tws: 22, awa: 90 },
+    { tws: 20, awa: 86 }
+  ],
+  
+  "A4": [
+    { tws: 22, awa: 90 },
+    { tws: 21, awa: 100 },
+    { tws: 22, awa: 110 },
+    { tws: 22.5, awa: 120 },
+    { tws: 22.5, awa: 130 },
+    { tws: 23, awa: 140 },
+    { tws: 25, awa: 150 },
+    { tws: 30, awa: 157 },
+    { tws: 31, awa: 150 },
+    { tws: 29.5, awa: 140 },
+    { tws: 28, awa: 130 },
+    { tws: 27.5, awa: 120 },
+    { tws: 27.5, awa: 110 },
+    { tws: 27, awa: 100 },
+    { tws: 22.5, awa: 90 }
+  ],
+  
+  "A5": [
+    { tws: 17.5, awa: 63 },
+    { tws: 17.5, awa: 70 },
+    { tws: 18.5, awa: 80 },
+    { tws: 22, awa: 90 },
+    { tws: 24.5, awa: 100 },
+    { tws: 27, awa: 110 },
+    { tws: 27, awa: 120 },
+    { tws: 27.5, awa: 130 },
+    { tws: 28, awa: 140 },
+    { tws: 30, awa: 143 },
+    { tws: 33, awa: 140 },
+    { tws: 33, awa: 130 },
+    { tws: 32, awa: 120 },
+    { tws: 31, awa: 110 },
+    { tws: 30, awa: 100 },
+    { tws: 28, awa: 90 },
+    { tws: 25, awa: 80 },
+    { tws: 22, awa: 70 },
+    { tws: 20, awa: 65 }
+  ],
+  
+  "A6": [
+    { tws: 26, awa: 90 },
+    { tws: 25, awa: 100 },
+    { tws: 26, awa: 110 },
+    { tws: 26.5, awa: 120 },
+    { tws: 26.5, awa: 130 },
+    { tws: 27, awa: 140 },
+    { tws: 27, awa: 150 },
+    { tws: 35, awa: 157 },
+    { tws: 36, awa: 150 },
+    { tws: 34.5, awa: 140 },
+    { tws: 33, awa: 130 },
+    { tws: 32.5, awa: 120 },
+    { tws: 32.5, awa: 110 },
+    { tws: 32, awa: 100 },
+    { tws: 27.5, awa: 90 }
+  ]
+};
+
+      // --- J SAIL RANGES (for upwind headsails) ---
+      const jSailRanges = {
+  "J1": { 
+    tws: { min: 0, max: 18 }, 
+    twa: { min: 20, max: 60 },  // Changed from awa to twa
+    optimalTws: 12,
+    optimalTwa: 35,  // Changed from optimalAwa to optimalTwa
+    category: "upwind"
+  },
+  "J2": { 
+    tws: { min: 12, max: 35 }, 
+    twa: { min: 20, max: 50 },
+    optimalTws: 18,
+    optimalTwa: 35,
+    category: "upwind"
+  },
+  "J3": { 
+    tws: { min: 30, max: 50 }, 
+    twa: { min: 20, max: 50 },
+    optimalTws: 35,
+    optimalTwa: 35,
+    category: "upwind"
+  }
+};
+      // --- SAILING FEASIBILITY CONFIG ---
+      const sailingLimits = {
+        j111: {
+          minVmgtwa: 45,
+          optimalUpwindTWA: 52,
+          optimalDownwindTWA: 90,
+          maxEffectiveTWA: 135,
+          highWindTWS: 18,
+          lightWindTWS: 8,
+          criticalAwsUpwind: 22,
+          criticalAwsDownwind: 25
+        }
+      };
+
+      // --- UTILS ---
+      const degToRad = d => d * Math.PI / 180;
+      const radToDeg = r => r * 180 / Math.PI;
+      const wrap360 = d => ((d % 360) + 360) % 360;
+      const wrap180 = d => { let x = wrap360(d); return x > 180 ? x - 360 : x; };
+      function lerp(x, x0, x1, y0, y1) { if (x1 === x0) return y0; return y0 + ((x - x0) / (x1 - x0)) * (y1 - y0); }
+
+      function boatSpeed(tws, twaDeg) {
+        let iT = 0;
+        while (iT < twsGrid.length - 1 && twsGrid[iT + 1] < tws) iT++;
+        const t0 = twsGrid[iT];
+        const t1 = twsGrid[Math.min(iT + 1, twsGrid.length - 1)];
+        
+        const angles_t0 = polars[t0].angles;
+        const speeds_t0 = polars[t0].speeds;
+        const angles_t1 = polars[t1].angles;
+        const speeds_t1 = polars[t1].speeds;
+        
+        const twa = Math.max(Math.min(twaDeg, Math.max(...angles_t0, ...angles_t1)), Math.min(...angles_t0, ...angles_t1));
+        
+        let iA_t0 = 0;
+        while (iA_t0 < angles_t0.length - 1 && angles_t0[iA_t0 + 1] < twa) iA_t0++;
+        const a0_t0 = angles_t0[iA_t0], a1_t0 = angles_t0[iA_t0 + 1];
+        const spd_t0 = lerp(twa, a0_t0, a1_t0, speeds_t0[iA_t0], speeds_t0[iA_t0 + 1]);
+        
+        let iA_t1 = 0;
+        while (iA_t1 < angles_t1.length - 1 && angles_t1[iA_t1 + 1] < twa) iA_t1++;
+        const a0_t1 = angles_t1[iA_t1], a1_t1 = angles_t1[iA_t1 + 1];
+        const spd_t1 = lerp(twa, a0_t1, a1_t1, speeds_t1[iA_t1], speeds_t1[iA_t1 + 1]);
+        
+        const spd = (t1 === t0) ? spd_t0 : lerp(tws, t0, t1, spd_t0, spd_t1);
+        
+        return {
+          speed: spd,
+          brackets: {
+            t0, t1,
+            a0_t0, a1_t0,
+            a0_t1, a1_t1
+          }
+        };
+      }
+
+      function apparentWindAbsolute(twd_from_deg, tws, hdg_to_deg, vb) {
+        const tw_to = wrap360(twd_from_deg + 180);
+        const twx = tws * Math.cos(degToRad(tw_to)), twy = tws * Math.sin(degToRad(tw_to));
+        const bx = vb * Math.cos(degToRad(hdg_to_deg)), by = vb * Math.sin(degToRad(hdg_to_deg));
+        const awx_to = twx - bx, awy_to = twy - by;
+        const aws = Math.hypot(awx_to, awy_to);
+        const aw_to = wrap360(radToDeg(Math.atan2(awy_to, awx_to)));
+        const aw_from = wrap360(aw_to + 180);
+        const awa_signed = wrap180(aw_from - hdg_to_deg);
+        const awa_abs = Math.abs(awa_signed);
+        const side = awa_signed < 0 ? "port" : "starboard";
+        return { aws, aw_to, aw_from, awa_abs, awa_signed, side };
+      }
+
+      // Point-in-Polygon Algorithm (Ray Casting)
+     function isPointInPolygon(point, polygon) {
+  const x = point.tws;
+  const y = point.awa;
+  let inside = false;
+  
+  const closedPolygon = [...polygon];
+  if (closedPolygon.length > 0) {
+    const first = closedPolygon[0];
+    const last = closedPolygon[closedPolygon.length - 1];
+    if (first.tws !== last.tws || first.awa !== last.awa) {
+      closedPolygon.push({ tws: first.tws, awa: first.awa });
+    }
+  }
+  
+  for (let i = 0, j = closedPolygon.length - 1; i < closedPolygon.length; j = i++) {
+    const xi = closedPolygon[i].tws, yi = closedPolygon[i].awa;
+    const xj = closedPolygon[j].tws, yj = closedPolygon[j].awa;
+    
+    const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+// NEW FUNCTION: Check if point is near polygon boundary with tolerance
+function isPointInPolygonWithTolerance(point, polygon, tolerance = 1.5) {
+  // First check exact point
+  if (isPointInPolygon(point, polygon)) return true;
+  
+  // Check nearby points (with small tolerance)
+  const offsets = [
+    { tws: 0, awa: tolerance },
+    { tws: 0, awa: -tolerance },
+    { tws: tolerance, awa: 0 },
+    { tws: -tolerance, awa: 0 }
+  ];
+  
+  for (const offset of offsets) {
+    const testPoint = {
+      tws: point.tws + offset.tws,
+      awa: point.awa + offset.awa
+    };
+    if (isPointInPolygon(testPoint, polygon)) return true;
+  }
+  
+  return false;
+}
+// DEBUG FUNCTION - Add this after isPointInPolygon
+function debugSailRecommendations(tws, twaSigned, apparentWindAngle) {
+  console.log("=== DEBUG SAIL RECOMMENDATIONS ===");
+  console.log(`TWS: ${tws}, TWA: ${twaSigned}, AWA: ${apparentWindAngle}`);
+  
+  const point = { tws, awa: Math.abs(apparentWindAngle) };
+  
+  Object.entries(sailPolygons).forEach(([sailType, polygon]) => {
+    const inside = isPointInPolygonWithTolerance(point, polygon, 1.5);
+    console.log(`${sailType}: ${inside ? '✓ IN' : '✗ OUT'}`);
+    
+    const twsVals = polygon.map(p => p.tws);
+    const awaVals = polygon.map(p => p.awa);
+    console.log(`  TWS range: ${Math.min(...twsVals)}-${Math.max(...twsVals)}`);
+    console.log(`  AWA range: ${Math.min(...awaVals)}-${Math.max(...awaVals)}`);
+  });
+}
+
+// SIMPLER ALTERNATIVE - Add this as a backup
+function recommendSailsSimple(tws, awa) {
+  const recommendations = [];
+  const absAwa = Math.abs(awa);
+  
+  // C0 check (simplified boundary)
+  if (tws >= 5 && tws <= 16 && absAwa >= 32 && absAwa <= 75) {
+    let isInC0 = false;
+    
+    if (tws <= 8 && absAwa >= 32 && absAwa <= 40 + (tws-5)*2.67) {
+      isInC0 = true;
+    } else if (tws <= 12 && absAwa >= 32 + (tws-5)*4.5 && absAwa <= 50 + (tws-8)*6.67) {
+      isInC0 = true;
+    } else if (tws <= 16 && absAwa >= 50 + (tws-12)*5 && absAwa <= 70 + (tws-12)*1.25) {
+      isInC0 = true;
+    }
+    
+    if (isInC0) {
+      const score = 100 - Math.abs(absAwa - 52) * 2;
+      recommendations.push({
+        type: "C0",
+        match: score > 80 ? "optimal" : "good",
+        score: Math.max(0, Math.min(100, score)),
+        details: `Code 0 - light air reaching sail`,
+        category: "flying"
+      });
+    }
+  }
+  
+  // A1.5 check
+  if (tws >= 8 && tws <= 17 && absAwa >= 61 && absAwa <= 137) {
+    const score = 100 - Math.abs(absAwa - 100) * 1.5;
+    recommendations.push({
+      type: "A1.5",
+      match: score > 80 ? "optimal" : "good",
+      score: Math.max(0, Math.min(100, score)),
+      details: `Light air asymmetric`,
+      category: "flying"
+    });
+  }
+  
+  return recommendations;
+}
+
+      function calculatePolygonScore(point, polygon) {
+        const centroid = polygon.reduce((acc, p) => {
+          return { tws: acc.tws + p.tws, awa: acc.awa + p.awa };
+        }, { tws: 0, awa: 0 });
+        
+        centroid.tws /= polygon.length;
+        centroid.awa /= polygon.length;
+        
+        const distance = Math.sqrt(
+          Math.pow(point.tws - centroid.tws, 2) + 
+          Math.pow(point.awa - centroid.awa, 2)
+        );
+        
+        const maxDistance = 20;
+        return Math.max(0, 100 - (distance / maxDistance) * 100);
+      }
+
+function recommendSailsPolygon(tws, twaSigned, apparentWindAngle) {
+  const recommendations = [];
+  const point = { tws: tws, awa: Math.abs(apparentWindAngle) };
+  
+  console.log(`Checking sails for TWS=${tws}, TWA=${twaSigned}, AWA=${point.awa}`);
+  
+  Object.entries(sailPolygons).forEach(([sailType, polygon]) => {
+    const inside = isPointInPolygonWithTolerance(point, polygon, 1.5);
+    console.log(`  ${sailType}: ${inside ? 'INSIDE' : 'OUTSIDE'}`);
+    
+    if (inside) {
+      const score = calculatePolygonScore(point, polygon);
+      
+      recommendations.push({
+        type: sailType,
+        match: score > 80 ? "optimal" : score > 60 ? "good" : "marginal",
+        score: score,
+        details: `Within ${sailType} performance envelope`,
+        category: "flying"
+      });
+    }
+  });
+  
+  if (recommendations.length === 0) {
+    console.log("No sails found with polygon method, trying simple method...");
+    const simpleRecs = recommendSailsSimple(tws, apparentWindAngle);
+    return simpleRecs;
+  }
+  
+  return recommendations;
+}
+  
+ 
+
+      function recommendJSails(tws, twaSigned) {
+  const recommendations = [];
+  const absTWA = Math.abs(twaSigned);
+  
+  Object.entries(jSailRanges).forEach(([sailType, range]) => {
+    const twsMatch = tws >= range.tws.min && tws <= range.tws.max;
+    const twaMatch = absTWA >= range.twa.min && absTWA <= range.twa.max;
+    
+    if (twsMatch && twaMatch) {
+      const twsDist = Math.abs(tws - range.optimalTws);
+      const twaDist = Math.abs(absTWA - range.optimalTwa);
+      const maxTwsDist = (range.tws.max - range.tws.min) / 2;
+      const maxTwaDist = (range.twa.max - range.twa.min) / 2;
+      
+      const twsScore = Math.max(0, 1 - (twsDist / maxTwsDist));
+      const twaScore = Math.max(0, 1 - (twaDist / maxTwaDist));
+      const score = (twsScore + twaScore) / 2 * 100;
+      
+      let matchType = "marginal";
+      if (score > 80) matchType = "optimal";
+      else if (score > 60) matchType = "good";
+      else if (score > 40) matchType = "acceptable";
+      
+      recommendations.push({
+        type: sailType,
+        match: matchType,
+        score: score,
+        details: `Upwind headsail (${range.tws.min}-${range.tws.max}kn TWS, ${range.twa.min}-${range.twa.max}° TWA)`,
+        category: range.category
+      });
+    }
+  });
+  
+  return recommendations;
+}
+
+      function recommendAllSails(tws, twaSigned, apparentWindAngle) {
+  const flyingSails = recommendSailsPolygon(tws, twaSigned, apparentWindAngle);
+  const jSails = recommendJSails(tws, twaSigned);
+  return [...flyingSails, ...jSails].sort((a, b) => b.score - a.score);
+}
+
+      // ... (keep the existing feasibility functions - they remain the same)
+function checkCourseFeasibility(twa, aws, tws, vb, awa) {  // ← ADD "awa" PARAMETER
+  const absTWA = Math.abs(twa);
+  const absAWA = Math.abs(awa || 0);
+  const results = [];
+  
+  const currentSpeed = vb;
+  
+  const angleToCheck = (absTWA > 90) ? absAWA : absTWA;
+  const angleType = (absTWA > 90) ? 'AWA' : 'TWA';
+  
+  if (absTWA < sailingLimits.j111.minVmgtwa) {
+    const minAngleSpeed = boatSpeed(tws, sailingLimits.j111.minVmgtwa).speed;
+    results.push({
+      feasible: false,
+      type: "no-go",
+      reason: `Poor VMG at ${absTWA.toFixed(1)}° TWA`,
+      details: `Boat speed ${currentSpeed.toFixed(1)}kn vs ${minAngleSpeed.toFixed(1)}kn at ${sailingLimits.j111.minVmgtwa}° TWA`,
+      suggestion: `Tack to ${sailingLimits.j111.optimalUpwindTWA}° TWA for better VMG`
+    });
+  }
+  
+  if (angleToCheck > sailingLimits.j111.maxEffectiveTWA) {
+    let optimalAngle, comparisonSpeed;
+    
+    if (absTWA > 90) {
+      optimalAngle = 100;
+      const estimatedOptimalTWA = optimalAngle + 20;
+      comparisonSpeed = boatSpeed(tws, estimatedOptimalTWA).speed;
+    } else {
+      optimalAngle = sailingLimits.j111.maxEffectiveTWA;
+      comparisonSpeed = boatSpeed(tws, optimalAngle).speed;
+    }
+    
+    results.push({
+      feasible: true,
+      type: "inefficient",
+      warning: `Inefficient sailing at ${angleToCheck.toFixed(1)}° ${angleType}`,
+      details: `Boat speed ${currentSpeed.toFixed(1)}kn`,
+      suggestion: `${absTWA > 90 ? 'Gybe' : 'Head up'} to achieve ~${optimalAngle}° ${angleType} for better speed`
+    });
+  }
+  
+  if (tws >= sailingLimits.j111.highWindTWS && absTWA < 70) {
+    const reefedTWS = sailingLimits.j111.highWindTWS - 2;
+    const reefedSpeed = boatSpeed(reefedTWS, absTWA).speed;
+    results.push({
+      feasible: true,
+      type: "high-wind",
+      warning: `High TWS (${tws.toFixed(1)}kn) for ${absTWA.toFixed(1)}° TWA sailing`,
+      details: `Current speed ${currentSpeed.toFixed(1)}kn`,
+      suggestion: `Reefing would maintain ~${reefedSpeed.toFixed(1)}kn with better control`
+    });
+  }
+  
+  if (tws <= sailingLimits.j111.lightWindTWS && absTWA > 110) {
+    const hotAngleSpeed = boatSpeed(tws, 90).speed;
+    results.push({
+      feasible: true,
+      type: "light-air",
+      warning: `Light air (${tws.toFixed(1)}kn TWS) at deep angle ${absTWA.toFixed(1)}° TWA`,
+      details: `Current speed ${currentSpeed.toFixed(1)}kn`,
+      suggestion: `Sail 90° TWA for ${hotAngleSpeed.toFixed(1)}kn boat speed`
+    });
+  }
+  
+  return results.filter(result => result.feasible === false || result.warning);
+}
+
+    function findOptimalUpwindTWA(tws) {
+  let bestTWA = sailingLimits.j111.optimalUpwindTWA;
+  let bestVMG = 0;
+  
+  // Change this from 38 to minVmgtwa (45)
+  for (let twa = sailingLimits.j111.minVmgtwa; twa <= 70; twa += 2) {
+    const speed = boatSpeed(tws, twa).speed;
+    const vmg = speed * Math.cos(degToRad(twa));
+    if (vmg > bestVMG) {
+      bestVMG = vmg;
+      bestTWA = twa;
+    }
+  }
+  return bestTWA;
+}
+
+      function findOptimalDownwindTWA(tws) {
+        let bestTWA = sailingLimits.j111.optimalDownwindTWA;
+        let bestVMG = 0;
+        
+        for (let twa = 90; twa <= 135; twa += 5) {
+          const speed = boatSpeed(tws, twa).speed;
+          const vmg = speed * Math.cos(degToRad(180 - twa));
+          if (vmg > bestVMG) {
+            bestVMG = vmg;
+            bestTWA = twa;
+          }
+        }
+        return bestTWA;
+      }
+
+      function suggestAlternativeCourses(twd, bearing, currentTWA, tws) {
+        const alternatives = [];
+        const absTWA = Math.abs(currentTWA);
+        
+        const optimalUpwindTWA = findOptimalUpwindTWA(tws);
+        const optimalDownwindTWA = findOptimalDownwindTWA(tws);
+        
+        if (absTWA < sailingLimits.j111.minVmgtwa) {
+          const portTackBearing = wrap360(twd + optimalUpwindTWA);
+          const starboardTackBearing = wrap360(twd - optimalUpwindTWA);
+          
+          const portSpeed = boatSpeed(tws, optimalUpwindTWA).speed;
+          const stbdSpeed = boatSpeed(tws, optimalUpwindTWA).speed;
+          
+          alternatives.push({
+            type: "tack",
+            bearing: portTackBearing,
+            speed: portSpeed,
+            twa: optimalUpwindTWA,
+            description: `Port tack to ${portTackBearing.toFixed(0)}° (${optimalUpwindTWA}° TWA)`
+          });
+          alternatives.push({
+            type: "tack", 
+            bearing: starboardTackBearing,
+            speed: stbdSpeed,
+            twa: optimalUpwindTWA,
+            description: `Starboard tack to ${starboardTackBearing.toFixed(0)}° (${optimalUpwindTWA}° TWA)`
+          });
+        }
+        
+        if (absTWA > optimalDownwindTWA + 20) {
+          const gybeBearing = wrap360(twd + optimalDownwindTWA);
+          const gybeSpeed = boatSpeed(tws, optimalDownwindTWA).speed;
+          
+          alternatives.push({
+            type: "gybe",
+            bearing: gybeBearing,
+            speed: gybeSpeed,
+            twa: optimalDownwindTWA,
+            description: `Gybe to ${gybeBearing.toFixed(0)}° (${optimalDownwindTWA}° TWA)`
+          });
+        }
+        
+        return alternatives;
+      }
+
+      // Initialize UI
+      const routeSel = document.getElementById('route');
+      routes.forEach((r, idx) => { 
+        const opt = document.createElement('option'); 
+        opt.value = idx; 
+        opt.textContent = `${r.start} → ${r.end} (bearing ${r.bearing}°, ${r.dist} NM)`; 
+        routeSel.appendChild(opt); 
+      });
+      
+      // Set default values
+      document.getElementById('twd').value = 240; 
+      document.getElementById('tws').value = 12;
+
+      // Route method toggle
+      const routeMethod = document.getElementById('routeMethod');
+      const predefinedSection = document.getElementById('predefinedRouteSection');
+      const customSection = document.getElementById('customRouteSection');
+
+      function updateRouteMethod() {
+        if (routeMethod.value === 'predefined') {
+          predefinedSection.style.display = 'block';
+          customSection.style.display = 'none';
+        } else {
+          predefinedSection.style.display = 'none';
+          customSection.style.display = 'block';
+        }
+      }
+
+      routeMethod.addEventListener('change', updateRouteMethod);
+
+      // Calculate button handler
+      document.getElementById('calc').addEventListener('click', function() {
+        document.body.classList.add('loading');
+        
+        setTimeout(function() {
+          try {
+            const method = document.getElementById('routeMethod').value;
+            let bearing, distance, startPoint, endPoint;
+            
+            if (method === 'predefined') {
+              const r = routes[Number(routeSel.value) || 0];
+              bearing = r.bearing;
+              distance = r.dist;
+              startPoint = r.start;
+              endPoint = r.end;
+            } else {
+              bearing = Number(document.getElementById('customBearing').value);
+              distance = Number(document.getElementById('customDistance').value) || 0;
+              startPoint = "Custom Start";
+              endPoint = "Custom Destination";
+              
+              if (isNaN(bearing)) {
+                document.getElementById('note').textContent = "Enter a valid custom bearing.";
+                document.body.classList.remove('loading');
+                return;
+              }
+            }
+            
+            const twd = Number(document.getElementById('twd').value);
+            const tws = Number(document.getElementById('tws').value);
+            
+            if (isNaN(twd) || isNaN(tws)) { 
+              document.getElementById('note').textContent = "Enter valid numeric TWD and TWS."; 
+              document.body.classList.remove('loading');
+              return; 
+            }
+            
+          const twaSigned = wrap180(twd - bearing);
+const twaAbs = Math.abs(twaSigned);
+const { speed: vb, brackets } = boatSpeed(tws, twaAbs);
+const app = apparentWindAbsolute(twd, tws, bearing, vb);
+
+debugSailRecommendations(tws, twaSigned, app.awa_abs);
+
+            // Update UI with results
+            document.getElementById('outBearing').textContent = `${bearing.toFixed(1)}°`;
+            document.getElementById('outTWA').textContent = `${twaAbs.toFixed(1)}°`;
+            document.getElementById('outTWASide').textContent = (twaSigned < 0) ? "port" : "starboard";
+            document.getElementById('outBSpd').textContent = vb.toFixed(2);
+            document.getElementById('outAWA').textContent = `${app.awa_abs.toFixed(1)}°`;
+            document.getElementById('outAWASide').textContent = app.side;
+            document.getElementById('outAWS').textContent = app.aws.toFixed(2);
+            document.getElementById('outAWD').textContent = `${app.aw_from.toFixed(1)}°`;
+
+            // Update details table
+            document.getElementById('dStart').textContent = startPoint;
+            document.getElementById('dEnd').textContent = endPoint;
+            document.getElementById('dDist').textContent = (method === 'predefined') ? distance.toFixed(2) : (distance > 0 ? distance.toFixed(2) + " (custom)" : "—");
+            document.getElementById('dTWD').textContent = `${twd.toFixed(1)}°`;
+            document.getElementById('dTWS').textContent = `${tws.toFixed(1)} kn`;
+
+            const angleBrackets = (brackets.a0_t0 === brackets.a0_t1 && brackets.a1_t0 === brackets.a1_t1) 
+              ? `TWA: ${brackets.a0_t0}–${brackets.a1_t0}°` 
+              : `TWA: ${brackets.a0_t0}–${brackets.a1_t0}° (${brackets.t0}kn) / ${brackets.a0_t1}–${brackets.a1_t1}° (${brackets.t1}kn)`;
+
+            document.getElementById('dBracket').textContent = `TWS: ${brackets.t0}–${brackets.t1} kn; ${angleBrackets}`;
+
+            if (brackets.t0 === brackets.t1) {
+              const currentPolar = polars[brackets.t0];
+              document.getElementById('dAngles').textContent = currentPolar.angles.join(", ");
+            } else {
+              const polar1 = polars[brackets.t0];
+              const polar2 = polars[brackets.t1];
+              document.getElementById('dAngles').textContent = 
+                `${brackets.t0}kn: ${polar1.angles.join(", ")} | ${brackets.t1}kn: ${polar2.angles.join(", ")}`;
+            }
+            
+            // Sail recommendations using new polygon system
+            const sailRecs = recommendAllSails(tws, twaSigned, app.awa_abs);
+            const sailContainer = document.getElementById('sailRecommendations');
+            
+            if (sailRecs.length === 0) {
+              sailContainer.innerHTML = '<div class="muted">No sail matches current conditions</div>';
+            } else {
+              let sailHTML = '';
+              sailRecs.forEach(rec => {
+                const scoreClass = rec.score > 80 ? 'success' : rec.score > 60 ? 'accent' : 'warning';
+                const borderClass = rec.score > 80 ? 'sail-perfect' : rec.score > 60 ? 'sail-partial' : 'sail-partial';
+                const categoryColor = rec.category === 'upwind' ? '#1e40af' : '#059669';
+                
+                sailHTML += `
+                  <div class="card ${borderClass}" style="margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <div>
+                        <span class="${scoreClass}" style="font-weight: bold;">${rec.type}</span>
+                        <span class="pill" style="margin-left: 8px; background: ${categoryColor}; color: white; border: none;">${rec.category}</span>
+                      </div>
+                      <div style="text-align: right;">
+                        <span class="pill" style="background: ${scoreClass === 'success' ? '#059669' : scoreClass === 'accent' ? '#1d4ed8' : '#d97706'}; color: white; border: none;">
+                          ${Math.round(rec.score)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div class="muted" style="font-size: 0.8rem; margin-top: 4px;">${rec.details}</div>
+                    <div style="margin-top: 4px;">
+                      <div style="background: #374151; border-radius: 4px; height: 6px; overflow: hidden;">
+                        <div style="background: ${scoreClass === 'success' ? '#10b981' : scoreClass === 'accent' ? '#3b82f6' : '#f59e0b'}; 
+                                    height: 100%; width: ${rec.score}%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              });
+              sailContainer.innerHTML = sailHTML;
+            }
+            
+            // Course feasibility check
+            const feasibilityResults = checkCourseFeasibility(twaSigned, app.aws, tws, vb, app.awa_abs);
+            const alternatives = suggestAlternativeCourses(twd, bearing, twaSigned, tws);
+            const feasibilityContainer = document.getElementById('feasibilityResults');
+            
+            if (feasibilityResults.length === 0) {
+              feasibilityContainer.innerHTML = `
+                <div class="card course-good">
+                  <div class="success" style="font-weight: bold;">✅ Course is sailable</div>
+                  <div class="muted" style="font-size: 0.8rem; margin-top: 4px;">Good TWA and boat speed for current conditions</div>
+                </div>
+              `;
+            } else {
+              let feasibilityHTML = '';
+              feasibilityResults.forEach(result => {
+                const borderClass = result.feasible === false ? 'course-error' : 'course-warning';
+                const colorClass = result.feasible === false ? 'error' : 'warning';
+                const icon = result.feasible === false ? '❌' : '⚠️';
+                const title = result.feasible === false ? 'COURSE NOT FEASIBLE' : result.warning;
+                
+                feasibilityHTML += `
+                  <div class="card ${borderClass}" style="margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span class="${colorClass}" style="font-weight: bold;">${icon} ${title}</span>
+                    </div>
+                    <div class="muted" style="font-size: 0.8rem; margin-top: 4px;">${result.details || result.reason}</div>
+                    <div class="accent" style="font-size: 0.8rem; margin-top: 2px;">${result.suggestion}</div>
+                  </div>
+                `;
+              });
+              
+              if (alternatives.length > 0) {
+                feasibilityHTML += `<div class="muted" style="margin-top: 12px; margin-bottom: 8px;">Alternative courses:</div>`;
+                alternatives.forEach(alt => {
+                  feasibilityHTML += `
+                    <div class="card" style="margin-bottom: 4px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>${alt.description}</span>
+                        <span class="accent">${alt.speed.toFixed(1)}kn</span>
+                      </div>
+                    </div>
+                  `;
+                });
+              }
+              
+              feasibilityContainer.innerHTML = feasibilityHTML;
+            }
+            
+            document.getElementById('note').textContent = "";
+          } catch (error) {
+            console.error("Calculation error:", error);
+            document.getElementById('note').textContent = "Error in calculation. Please check inputs.";
+          } finally {
+            document.body.classList.remove('loading');
+          }
+        }, 10);
+      });
+
+      // Trigger initial calculation
+      document.getElementById('calc').click();
+    });
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js')
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful');
+          })
+          .catch(function(error) {
+            console.log('ServiceWorker registration failed: ', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>

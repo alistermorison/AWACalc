@@ -1,0 +1,73 @@
+{
+  "name": "AWA Calculator",
+  "short_name": "AWACalc",
+  "description": "J111 polar-based Apparent Wind Angle calculator for Tasman routes",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["navigation", "sports", "weather"],
+  "lang": "en",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Calculate AWA",
+      "short_name": "Calculate",
+      "description": "Calculate Apparent Wind Angle",
+      "url": "/?action=calculate",
+      "icons": [
+        {
+          "src": "icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "AWA Calculator desktop interface"
+    },
+    {
+      "src": "screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AWA Calculator mobile interface"
+    }
+  ],
+  "id": "/?source=pwa",
+  "launch_handler": {
+    "client_mode": "auto"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}
