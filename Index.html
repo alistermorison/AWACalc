@@ -308,7 +308,98 @@
         console.log(`Orientation: ${screen.orientation.type}`);
       }
     }
+// ========================
+// ENHANCED SCREEN ROTATION HANDLER FOR PWA
+// ========================
+function enhancedOrientationHandler() {
+  // Force viewport to recalculate
+  const viewport = document.querySelector('meta[name=viewport]');
+  if (viewport) {
+    const content = viewport.getAttribute('content');
+    viewport.setAttribute('content', content + ', height=' + window.innerHeight);
+    setTimeout(() => {
+      viewport.setAttribute('content', content);
+    }, 10);
+  }
 
+  // Force all sections to recalculate their dimensions
+  const allSections = document.querySelectorAll('section, .card, .grid');
+  allSections.forEach(el => {
+    el.style.transform = 'translateZ(0)';
+    setTimeout(() => {
+      el.style.transform = '';
+    }, 50);
+  });
+
+  // Trigger resize event for any listeners
+  window.dispatchEvent(new Event('resize'));
+  
+  // Force repaint of the entire page
+  document.body.style.display = 'none';
+  setTimeout(() => {
+    document.body.style.display = '';
+  }, 10);
+}
+
+// Replace the existing setupOrientationHandlers with this enhanced version
+function setupOrientationHandlers() {
+  // Method 1: screen.orientation API
+  if (window.screen && screen.orientation) {
+    try {
+      screen.orientation.addEventListener('change', function() {
+        setTimeout(enhancedOrientationHandler, 100);
+      });
+    } catch(e) {
+      console.log('screen.orientation event listener failed', e);
+    }
+  }
+  
+  // Method 2: orientationchange event
+  window.addEventListener('orientationchange', function() {
+    setTimeout(enhancedOrientationHandler, 150);
+  });
+  
+  // Method 3: resize with dimension comparison
+  let lastWidth = window.innerWidth;
+  let lastHeight = window.innerHeight;
+  let orientationChangeTimer;
+  
+  window.addEventListener('resize', function() {
+    clearTimeout(orientationChangeTimer);
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const aspectRatio = width/height;
+    const lastAspectRatio = lastWidth/lastHeight;
+    
+    // Check if orientation likely changed
+    if (Math.abs(aspectRatio - lastAspectRatio) > 0.1) {
+      orientationChangeTimer = setTimeout(enhancedOrientationHandler, 100);
+    }
+    
+    lastWidth = width;
+    lastHeight = height;
+  });
+}
+
+// Also handle when PWA becomes visible again (user switches back to app)
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    setTimeout(enhancedOrientationHandler, 50);
+  }
+});
+
+// Handle when app is first launched/installed
+window.addEventListener('load', function() {
+  setTimeout(enhancedOrientationHandler, 200);
+});
+
+// iOS standalone mode specific fix
+if (window.navigator.standalone) {
+  window.addEventListener('resize', function() {
+    setTimeout(enhancedOrientationHandler, 100);
+  });
+}
     // Listen to orientation changes - FIXED FOR PWA
     function setupOrientationHandlers() {
       // Method 1: screen.orientation API (works in some PWAs)
@@ -349,10 +440,13 @@
       });
     }
 
-    // Also call once at load
+      // Also call once at load
     window.addEventListener('DOMContentLoaded', function() {
       handleScreenOrientation();
-      setupOrientationHandlers();
+      setTimeout(function() {
+        setupOrientationHandlers();
+        enhancedOrientationHandler(); // Initial call to ensure correct layout
+      }, 100);
     });
 
     // ========================
