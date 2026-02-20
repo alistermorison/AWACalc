@@ -400,45 +400,7 @@ if (window.navigator.standalone) {
     setTimeout(enhancedOrientationHandler, 100);
   });
 }
-    // Listen to orientation changes - FIXED FOR PWA
-    function setupOrientationHandlers() {
-      // Method 1: screen.orientation API (works in some PWAs)
-      if (window.screen && screen.orientation) {
-        try {
-          screen.orientation.addEventListener('change', function() {
-            handleScreenOrientation();
-          });
-        } catch(e) {
-          console.log('screen.orientation event listener failed', e);
-        }
-      }
-      
-      // Method 2: orientationchange event (works in most PWAs)
-      window.addEventListener('orientationchange', function() {
-        // Small delay for orientation to complete
-        setTimeout(handleScreenOrientation, 50);
-      });
-      
-      // Method 3: resize with dimension comparison (always works)
-      let lastWidth = window.innerWidth;
-      let lastHeight = window.innerHeight;
-      
-      window.addEventListener('resize', function() {
-        // Check if dimensions significantly changed (orientation likely)
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        const widthChanged = Math.abs(width - lastWidth) > 100;
-        const heightChanged = Math.abs(height - lastHeight) > 100;
-        const aspectRatioChanged = (width/height) !== (lastWidth/lastHeight);
-        
-        if (widthChanged || heightChanged || aspectRatioChanged) {
-          handleScreenOrientation();
-        }
-        
-        lastWidth = width;
-        lastHeight = height;
-      });
-    }
+ 
 
       // Also call once at load
     window.addEventListener('DOMContentLoaded', function() {
