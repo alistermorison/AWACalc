@@ -285,29 +285,7 @@
   </footer>
 
   <script>
-    // ========================
-    // SCREEN ROTATION HANDLER - FIXED FOR PWA INSTALLED MODE
-    // ========================
-    function handleScreenOrientation() {
-      // Force repaint for PWA installed mode
-      document.body.style.transform = 'translateZ(0)';
-      
-      // Small delay to allow CSS to apply
-      setTimeout(() => {
-        document.body.style.transform = '';
-        
-        // Force any viewport-constrained elements to recalc
-        const main = document.querySelector('main');
-        if (main) {
-          main.style.display = 'none';
-          main.style.display = 'grid';
-        }
-      }, 20);
-      
-      if (screen.orientation) {
-        console.log(`Orientation: ${screen.orientation.type}`);
-      }
-    }
+
 // ========================
 // ENHANCED SCREEN ROTATION HANDLER FOR PWA
 // ========================
@@ -402,9 +380,8 @@ if (window.navigator.standalone) {
 }
  
 
-      // Also call once at load
+           // Also call once at load
     window.addEventListener('DOMContentLoaded', function() {
-      handleScreenOrientation();
       setTimeout(function() {
         setupOrientationHandlers();
         enhancedOrientationHandler(); // Initial call to ensure correct layout
