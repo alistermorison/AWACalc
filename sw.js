@@ -1,27 +1,37 @@
-const CACHE_NAME = 'awa-calc-v6';
+const CACHE_NAME = 'awa-calc-v7';
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
   '/screenshot-desktop.png',
-  '/screenshot-mobile.png'
+  '/screenshot-mobile.png',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  '/logo.png'
 ];
 
-// Install event – cache essential assets
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache).catch(err => {
-        console.warn('Some files failed to cache:', err);
-        // Continue anyway – don't let one failure break the install
-        return Promise.resolve();
-      });
+    caches.open(CACHE_NAME).then(async cache => {
+      // Try to cache each URL individually – skip failures
+      for (const url of urlsToCache) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            await cache.put(url, response);
+            console.log(`Cached: ${url}`);
+          } else {
+            console.warn(`Failed to cache ${url}: status ${response.status}`);
+          }
+        } catch (err) {
+          console.warn(`Error caching ${url}:`, err);
+        }
+      }
     })
   );
   self.skipWaiting();
 });
 
-// Activate event – clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
@@ -37,23 +47,20 @@ self.addEventListener('activate', event => {
   return self.clients.claim();
 });
 
-// Fetch event – try network first, fall back to cache
 self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // If we got a valid response, clone and cache it for offline use
-        const responseClone = response.clone();
+        // Cache successful responses for future offline use
+        const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => {
-          // Only cache GET requests for same-origin or simple assets
-          if (event.request.method === 'GET' && event.request.url.startsWith(self.location.origin)) {
-            cache.put(event.request, responseClone);
+          if (event.request.method === 'GET' && response.ok) {
+            cache.put(event.request, clone);
           }
         });
         return response;
       })
       .catch(() => {
-        // Network failed – fall back to cache
         return caches.match(event.request);
       })
   );
