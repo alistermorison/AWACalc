@@ -1,24 +1,28 @@
-const CACHE_NAME = 'awa-calc-v2';
+const CACHE_NAME = 'awa-calc-v3';
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll([
-        '/',
-        '/index.html'
-      ]);
+      // Cache only the root – it always exists
+      return cache.add('/');
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
       );
     })
   );
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
