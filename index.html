@@ -742,11 +742,15 @@
       }
 
 function recommendAllSails(tws, twaSigned, apparentWindAngle) {
+  console.log('👉 recommendAllSails called');
   const flyingSails = recommendSailsPolygon(tws, twaSigned, apparentWindAngle);
+  console.log('👉 flyingSails:', flyingSails);
   let jSails = recommendJSails(tws, twaSigned);
+  console.log('👉 jSails before fallback:', jSails);
   
-  // Fallback: if no J-sails and we're upwind
+  // Fallback: if no J-sails and we're upwind (TWA < 60°) and TWS ≤ 18
   if (jSails.length === 0 && Math.abs(twaSigned) < 60 && tws <= 18) {
+    console.log('👉 Adding fallback J1 recommendation');
     jSails = [{
       type: "J1 (recommended)",
       match: "good",
@@ -756,6 +760,7 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
     }];
   }
   
+  console.log('👉 final jSails:', jSails);
   return [...flyingSails, ...jSails].sort((a, b) => b.score - a.score);
 }
 
