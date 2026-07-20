@@ -1,13 +1,9 @@
-const CACHE_NAME = 'awa-calc-v4';
+const CACHE_NAME = 'awa-calc-v5';
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Only cache index.html – it always exists.
-      return cache.add('/index.html');
-    })
-  );
+  // Activate immediately – do NOT cache anything during install.
   self.skipWaiting();
+  event.waitUntil(Promise.resolve());
 });
 
 self.addEventListener('activate', event => {
@@ -26,13 +22,11 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Network‑first: always try to fetch from network.
+  // Only fall back to cache if network fails.
   event.respondWith(
-    caches.match(event.request).then(response => {
-      // If the request is for the root, return index.html from cache
-      if (event.request.url === self.location.origin + '/' || event.request.url === self.location.origin + '/index.html') {
-        return response || fetch('/index.html');
-      }
-      return response || fetch(event.request);
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
