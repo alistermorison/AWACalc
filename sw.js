@@ -2,18 +2,12 @@ const CACHE_NAME = 'awa-calc-v4';
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        // Try to cache the root, but don't fail if it errors
-        return cache.add('/').catch(err => {
-          console.warn('Failed to cache /, but continuing:', err);
-        });
-      })
-      .then(() => {
-        // Ensure the service worker activates even if caching failed
-        self.skipWaiting();
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      // Only cache index.html – it always exists.
+      return cache.add('/index.html');
+    })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -27,21 +21,18 @@ self.addEventListener('activate', event => {
         })
       );
     })
-    .then(() => {
-      return self.clients.claim();
-    })
   );
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        return response || fetch(event.request);
-      })
-      .catch(() => {
-        // Fallback: if both cache and network fail, return a simple response
-        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-      })
+    caches.match(event.request).then(response => {
+      // If the request is for the root, return index.html from cache
+      if (event.request.url === self.location.origin + '/' || event.request.url === self.location.origin + '/index.html') {
+        return response || fetch('/index.html');
+      }
+      return response || fetch(event.request);
+    })
   );
 });
