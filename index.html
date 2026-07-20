@@ -741,11 +741,23 @@
         return recommendations;
       }
 
-      function recommendAllSails(tws, twaSigned, apparentWindAngle) {
-        const flyingSails = recommendSailsPolygon(tws, twaSigned, apparentWindAngle);
-        const jSails = recommendJSails(tws, twaSigned);
-        return [...flyingSails, ...jSails].sort((a, b) => b.score - a.score);
-      }
+function recommendAllSails(tws, twaSigned, apparentWindAngle) {
+  const flyingSails = recommendSailsPolygon(tws, twaSigned, apparentWindAngle);
+  let jSails = recommendJSails(tws, twaSigned);
+  
+  // Fallback: if no J-sails and we're upwind
+  if (jSails.length === 0 && Math.abs(twaSigned) < 60 && tws <= 18) {
+    jSails = [{
+      type: "J1 (recommended)",
+      match: "good",
+      score: 75,
+      details: "Upwind headsail for these conditions",
+      category: "upwind"
+    }];
+  }
+  
+  return [...flyingSails, ...jSails].sort((a, b) => b.score - a.score);
+}
 
       // --- Feasibility functions ---
       function checkCourseFeasibility(twa, aws, tws, vb, awa) {
