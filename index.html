@@ -712,34 +712,42 @@
       }
 
       function recommendJSails(tws, twaSigned) {
-        const recommendations = [];
-        const absTWA = Math.abs(twaSigned);
-        Object.entries(jSailRanges).forEach(([sailType, range]) => {
-          const twsMatch = tws >= range.tws.min && tws <= range.tws.max;
-          const twaMatch = absTWA >= range.twa.min && absTWA <= range.twa.max;
-          if (twsMatch && twaMatch) {
-            const twsDist = Math.abs(tws - range.optimalTws);
-            const twaDist = Math.abs(absTWA - range.optimalTwa);
-            const maxTwsDist = (range.tws.max - range.tws.min) / 2;
-            const maxTwaDist = (range.twa.max - range.twa.min) / 2;
-            const twsScore = Math.max(0, 1 - (twsDist / maxTwsDist));
-            const twaScore = Math.max(0, 1 - (twaDist / maxTwaDist));
-            const score = (twsScore + twaScore) / 2 * 100;
-            let matchType = "marginal";
-            if (score > 80) matchType = "optimal";
-            else if (score > 60) matchType = "good";
-            else if (score > 40) matchType = "acceptable";
-            recommendations.push({
-              type: sailType,
-              match: matchType,
-              score: score,
-              details: `Upwind headsail (${range.tws.min}-${range.tws.max}kn TWS, ${range.twa.min}-${range.twa.max}° TWA)`,
-              category: range.category
-            });
-          }
-        });
-        return recommendations;
-      }
+  console.log('🔍 recommendJSails called with TWS=', tws, 'TWA=', twaSigned);
+  const recommendations = [];
+  const absTWA = Math.abs(twaSigned);
+  
+  Object.entries(jSailRanges).forEach(([sailType, range]) => {
+    const twsMatch = tws >= range.tws.min && tws <= range.tws.max;
+    const twaMatch = absTWA >= range.twa.min && absTWA <= range.twa.max;
+    console.log(`  ${sailType}: twsMatch=${twsMatch}, twaMatch=${twaMatch}`);
+    
+    if (twsMatch && twaMatch) {
+      // scoring logic (keep your existing code)
+      const twsDist = Math.abs(tws - range.optimalTws);
+      const twaDist = Math.abs(absTWA - range.optimalTwa);
+      const maxTwsDist = (range.tws.max - range.tws.min) / 2 || 1;
+      const maxTwaDist = (range.twa.max - range.twa.min) / 2 || 1;
+      const twsScore = Math.max(0, 1 - (twsDist / maxTwsDist));
+      const twaScore = Math.max(0, 1 - (twaDist / maxTwaDist));
+      const score = (twsScore + twaScore) / 2 * 100;
+      let matchType = "marginal";
+      if (score > 80) matchType = "optimal";
+      else if (score > 60) matchType = "good";
+      else if (score > 40) matchType = "acceptable";
+      
+      recommendations.push({
+        type: sailType,
+        match: matchType,
+        score: score,
+        details: `Upwind headsail (${range.tws.min}-${range.tws.max}kn TWS, ${range.twa.min}-${range.twa.max}° TWA)`,
+        category: range.category
+      });
+    }
+  });
+  
+  console.log('🔍 JSails recommendations:', recommendations);
+  return recommendations;
+}
 
 function recommendAllSails(tws, twaSigned, apparentWindAngle) {
   console.log('👉 recommendAllSails called');
