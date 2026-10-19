@@ -192,7 +192,9 @@
     table.sailgrid td .p { font-weight:700; font-size:0.8rem; color:#0f172a; }
     table.sailgrid td .s { font-size:0.65rem; color:#1f2937; }
     table.sailgrid td.auto { background-image: repeating-linear-gradient(45deg, rgba(15,23,42,.35) 0 3px, transparent 3px 7px); }
-    table.sailgrid td.current { border-color:#f8fafc; box-shadow:0 0 0 2px #38bdf8; }
+    table.sailgrid td.current { border:3px solid #ef4444; box-shadow:0 0 0 3px #f8fafc, 0 0 14px 4px rgba(239,68,68,.8); z-index:2; animation: sgPulse 1.6s ease-in-out infinite; }
+    @keyframes sgPulse { 50% { box-shadow:0 0 0 3px #f8fafc, 0 0 4px 1px rgba(239,68,68,.4); } }
+    table.sailgrid th.curaxis { color:#f8fafc; background:#ef4444; border-radius:4px; font-weight:700; }
     table.sailgrid td.disagree { border-color:#f59e0b; }
     table.sailgrid td .n { position:absolute; top:1px; right:2px; font-size:0.55rem; color:#0f172a; font-weight:700; }
     .legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:0.75rem; }
@@ -304,7 +306,7 @@
 
     <section class="full">
       <h2>Sail grid</h2>
-      <div class="muted">1st and 2nd choice for each TWS band and AWA band. Tap a cell to change it. The outlined cell is the current conditions.</div>
+      <div class="muted">1st and 2nd choice for each TWS band and AWA band. Tap a cell to change it. The red pulsing cell is the current conditions.</div>
       <div class="grid-wrap" id="gridTable"></div>
       <div class="legend" id="gridLegend"></div>
       <p class="hint" id="gridStatus"></p>
@@ -1202,10 +1204,10 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
       function renderGrid() {
         const cur = last ? cellFor(last.tws, last.awa) : null;
         let h = '<table class="sailgrid"><thead><tr><th class="rowh">TWS \\ AWA</th>';
-        for (let j = 0; j < grid.awaEdges.length - 1; j++) h += `<th>${grid.awaEdges[j]}°</th>`;
+        for (let j = 0; j < grid.awaEdges.length - 1; j++) h += `<th class="${cur && cur[1] === j ? 'curaxis' : ''}">${grid.awaEdges[j]}°</th>`;
         h += '</tr></thead><tbody>';
         for (let i = grid.cells.length - 1; i >= 0; i--) {
-          h += `<tr><th class="rowh">${grid.twsEdges[i]}–${grid.twsEdges[i + 1]}</th>`;
+          h += `<tr><th class="rowh ${cur && cur[0] === i ? 'curaxis' : ''}">${grid.twsEdges[i]}–${grid.twsEdges[i + 1]}</th>`;
           grid.cells[i].forEach((c, j) => {
             const n = logsInCell(i, j).length;
             const cls = [c.auto ? 'auto' : '', cur && cur[0] === i && cur[1] === j ? 'current' : '', disagrees(i, j) ? 'disagree' : ''].join(' ');
@@ -1217,6 +1219,11 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
         h += '</tbody></table>';
         document.getElementById('gridTable').innerHTML = h;
         document.querySelectorAll('#gridTable td').forEach(td => td.onclick = () => openCellEditor(+td.dataset.i, +td.dataset.j));
+        const curTd = document.querySelector('#gridTable td.current');
+        if (curTd) {
+          const wrap = document.getElementById('gridTable');
+          wrap.scrollLeft = Math.max(0, curTd.offsetLeft - wrap.clientWidth / 2 + curTd.offsetWidth / 2);
+        }
         document.getElementById('gridLegend').innerHTML = grid.sails.map(s => `<span style="background:${colorOf(s)}">${esc(s)}</span>`).join('');
         const autoCount = grid.cells.flat().filter(c => c.auto).length;
         document.getElementById('gridStatus').textContent = autoCount
