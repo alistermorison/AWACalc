@@ -173,6 +173,44 @@
       opacity: 0.6;
       pointer-events: none;
     }
+    /* ===== Sail grid, 1st/2nd choice and sail log ===== */
+    .full { grid-column: 1 / -1; }
+    main > section { min-width: 0; }
+    .choice { display:flex; align-items:center; gap:10px; }
+    .choice .rank { font-size:0.75rem; color:#9ca3af; width:64px; flex-shrink:0; }
+    .choice .sail { font-size:1.4rem; font-weight:700; }
+    .hint { font-size:0.85rem; color:#9ca3af; margin-top:6px; }
+    .flag { color:#f59e0b; font-size:0.85rem; margin-top:6px; }
+    .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-row .btn { width:auto; flex:1 1 140px; }
+    .btn.primary { background:#0369a1; border-color:#0369a1; }
+    .grid-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:8px; border:1px solid #1f2937; border-radius:8px; }
+    table.sailgrid { border-collapse:separate; border-spacing:2px; margin:0; width:auto; }
+    table.sailgrid th { font-size:0.7rem; color:#9ca3af; font-weight:500; padding:2px 4px; text-align:center; white-space:nowrap; border:none; }
+    table.sailgrid th.rowh { position:sticky; left:0; background:#111827; z-index:1; text-align:right; }
+    table.sailgrid td { min-width:46px; height:40px; padding:2px; text-align:center; border-radius:4px; cursor:pointer; border:2px solid transparent; line-height:1.05; position:relative; }
+    table.sailgrid td .p { font-weight:700; font-size:0.8rem; color:#0f172a; }
+    table.sailgrid td .s { font-size:0.65rem; color:#1f2937; }
+    table.sailgrid td.auto { background-image: repeating-linear-gradient(45deg, rgba(15,23,42,.35) 0 3px, transparent 3px 7px); }
+    table.sailgrid td.current { border-color:#f8fafc; box-shadow:0 0 0 2px #38bdf8; }
+    table.sailgrid td.disagree { border-color:#f59e0b; }
+    table.sailgrid td .n { position:absolute; top:1px; right:2px; font-size:0.55rem; color:#0f172a; font-weight:700; }
+    .legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:0.75rem; }
+    .legend span { padding:2px 8px; border-radius:999px; color:#0f172a; font-weight:600; }
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; display:none; align-items:flex-end; justify-content:center; }
+    .modal-bg.open { display:flex; }
+    .modal { background:#111827; border:1px solid #374151; border-radius:12px 12px 0 0; padding:16px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+    @media (min-width: 769px) { .modal-bg { align-items:center; } .modal { border-radius:12px; } }
+    .modal h3 { margin:0 0 4px 0; }
+    .seg { display:flex; gap:6px; }
+    .seg label { flex:1; margin:0; text-align:center; padding:10px 4px; border:1px solid #374151; border-radius:8px; cursor:pointer; color:#e5e7eb; }
+    .seg input { display:none; }
+    .seg input:checked + span { color:#38bdf8; font-weight:700; }
+    .seg label:has(input:checked) { border-color:#38bdf8; background:#0b1220; }
+    .check { display:flex; align-items:center; gap:8px; margin-top:10px; color:#e5e7eb; }
+    .check input { width:auto; -webkit-appearance:checkbox; appearance:auto; }
+    .loglist .card { margin-bottom:6px; font-size:0.85rem; }
+    textarea { width:100%; padding:12px; border-radius:8px; border:1px solid #374151; background:#0b1220; color:#e5e7eb; font-size:16px; font-family:inherit; }
   </style>
 </head>
 <body>
@@ -264,11 +302,38 @@
       <div id="sailRecommendations"><div class="muted">Calculate to see sail recommendations</div></div>
     </section>
 
+    <section class="full">
+      <h2>Sail grid</h2>
+      <div class="muted">1st and 2nd choice for each TWS band and AWA band. Tap a cell to change it. The outlined cell is the current conditions.</div>
+      <div class="grid-wrap" id="gridTable"></div>
+      <div class="legend" id="gridLegend"></div>
+      <p class="hint" id="gridStatus"></p>
+      <div class="btn-row">
+        <button class="btn" id="addSail">Add sail</button>
+        <button class="btn" id="exportGrid">Export grid</button>
+        <button class="btn" id="importGrid">Import grid</button>
+        <button class="btn" id="resetGrid">Reset grid</button>
+      </div>
+      <input type="file" id="importGridFile" accept=".json,application/json" style="display:none" />
+    </section>
+
+    <section class="full">
+      <h2>Sail log</h2>
+      <div class="muted" id="logCount"></div>
+      <div class="loglist" id="logList" style="margin-top:8px"></div>
+      <div class="btn-row">
+        <button class="btn" id="exportLog">Export log (CSV)</button>
+        <button class="btn" id="clearLog">Clear log</button>
+      </div>
+    </section>
+
     <section>
       <h2>Course Feasibility</h2>
       <div id="feasibilityResults"><div class="muted">Calculate to see course analysis</div></div>
     </section>
   </main>
+
+  <div class="modal-bg" id="sgModal"><div class="modal" id="sgModalBody"></div></div>
 
   <!-- Install Prompt -->
   <div id="installPrompt">
@@ -910,6 +975,15 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
       }
       routeMethod.addEventListener('change', updateRouteMethod);
 
+      window.AWACalc = {
+        windFor(twd, tws, course) {
+          const twaSigned = wrap180(twd - course);
+          const { speed: vb } = boatSpeed(tws, Math.abs(twaSigned));
+          const app = apparentWindAbsolute(twd, tws, course, vb);
+          return { twa: Math.abs(twaSigned), awa: app.awa_abs, aws: app.aws, vb };
+        }
+      };
+
       document.getElementById('calc').addEventListener('click', function() {
         document.body.classList.add('loading');
         setTimeout(function() {
@@ -944,8 +1018,7 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
             const twaAbs = Math.abs(twaSigned);
             const { speed: vb, brackets } = boatSpeed(tws, twaAbs);
             const app = apparentWindAbsolute(twd, tws, bearing, vb);
-            debugSailRecommendations(tws, twaSigned, app.awa_abs);
-
+            
             // Update UI
             document.getElementById('outBearing').textContent = `${bearing.toFixed(1)}°`;
             document.getElementById('outTWA').textContent = `${twaAbs.toFixed(1)}°`;
@@ -973,41 +1046,11 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
                 `${brackets.t0}kn: ${polars[brackets.t0].angles.join(", ")} | ${brackets.t1}kn: ${polars[brackets.t1].angles.join(", ")}`;
             }
 
-            // Sail recommendations
-            const sailRecs = recommendAllSails(tws, twaSigned, app.awa_abs);
-            const sailContainer = document.getElementById('sailRecommendations');
-            if (sailRecs.length === 0) {
-              sailContainer.innerHTML = '<div class="muted">No sail matches current conditions</div>';
-            } else {
-              let sailHTML = '';
-              sailRecs.forEach(rec => {
-                const scoreClass = rec.score > 80 ? 'success' : rec.score > 60 ? 'accent' : 'warning';
-                const borderClass = rec.score > 80 ? 'sail-perfect' : rec.score > 60 ? 'sail-partial' : 'sail-partial';
-                const categoryColor = rec.category === 'upwind' ? '#1e40af' : '#059669';
-                sailHTML += `
-                  <div class="card ${borderClass}" style="margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <div>
-                        <span class="${scoreClass}" style="font-weight: bold;">${rec.type}</span>
-                        <span class="pill" style="margin-left: 8px; background: ${categoryColor}; color: white; border: none;">${rec.category}</span>
-                      </div>
-                      <div style="text-align: right;">
-                        <span class="pill" style="background: ${scoreClass === 'success' ? '#059669' : scoreClass === 'accent' ? '#1d4ed8' : '#d97706'}; color: white; border: none;">
-                          ${Math.round(rec.score)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div class="muted" style="font-size: 0.8rem; margin-top: 4px;">${rec.details}</div>
-                    <div style="margin-top: 4px;">
-                      <div style="background: #374151; border-radius: 4px; height: 6px; overflow: hidden;">
-                        <div style="background: ${scoreClass === 'success' ? '#10b981' : scoreClass === 'accent' ? '#3b82f6' : '#f59e0b'}; height: 100%; width: ${rec.score}%;"></div>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              });
-              sailContainer.innerHTML = sailHTML;
-            }
+            // Sail recommendations from the sail grid
+            window.SailGrid.onCalculate({
+              tws, twd, awa: app.awa_abs, aws: app.aws, bearing,
+              courseSource: method === 'predefined' ? `${startPoint} → ${endPoint}` : 'custom bearing'
+            });
 
             // Feasibility
             const feasibilityResults = checkCourseFeasibility(twaSigned, app.aws, tws, vb, app.awa_abs);
@@ -1064,6 +1107,307 @@ function recommendAllSails(tws, twaSigned, apparentWindAngle) {
 
       document.getElementById('calc').click();
     });
+
+    // ========================
+    // SAIL GRID: 1st/2nd choice per TWS x AWA cell, editor, and sail log
+    // ========================
+    (function() {
+      const GRID_KEY = 'awacalc.sailGrid.v1';
+      const LOG_KEY = 'awacalc.sailLog.v1';
+      const SAIL_COLORS = {
+        'J1':'#93c5fd', 'J2':'#60a5fa', 'J3':'#3b82f6', 'C0':'#d6d3d1',
+        'A1.5':'#a5b4fc', 'A2':'#bae6fd', 'A3':'#f9a8d4', 'A4':'#6ee7b7', 'A5':'#a8a29e', 'A6':'#fcd34d'
+      };
+      const DEFAULT_GRID = {"twsEdges":[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40],"awaEdges":[20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180],"cells":[[{"p":"J1","s":"C0","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A1.5","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"C0","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A1.5","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"C0","auto":0},{"p":"C0","s":"J1","auto":0},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A1.5","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"C0","auto":0},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"J1","auto":0},{"p":"C0","s":"A1.5","auto":0},{"p":"C0","s":"A1.5","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"C0","auto":0},{"p":"J1","s":"C0","auto":1},{"p":"C0","s":"J1","auto":0},{"p":"C0","s":"A1.5","auto":0},{"p":"C0","s":"A1.5","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"C0","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"J2","auto":0},{"p":"J1","s":"C0","auto":0},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A1.5","auto":0},{"p":"C0","s":"A1.5","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J1","s":"J2","auto":0},{"p":"J1","s":"J2","auto":0},{"p":"J1","s":"C0","auto":1},{"p":"C0","s":"A1.5","auto":0},{"p":"C0","s":"A1.5","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J2","s":"J1","auto":0},{"p":"J1","s":"J2","auto":0},{"p":"J1","s":"C0","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A1.5","auto":0},{"p":"A1.5","s":"C0","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":0},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A1.5","s":"A2","auto":1}],[{"p":"J2","s":"J1","auto":0},{"p":"J1","s":"J2","auto":0},{"p":"J1","s":"J2","auto":1},{"p":"C0","s":"J1","auto":1},{"p":"C0","s":"A5","auto":1},{"p":"A1.5","s":"A2","auto":1},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1}],[{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"J1","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"C0","auto":0},{"p":"A5","s":"A2","auto":0},{"p":"A2","s":"A5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":0},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1},{"p":"A2","s":"A1.5","auto":1}],[{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"J1","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"C0","auto":1},{"p":"A5","s":"A2","auto":0},{"p":"A5","s":"A2","auto":0},{"p":"A2","s":"A5","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":1},{"p":"A2","s":"A4","auto":1},{"p":"A2","s":"A4","auto":1}],[{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"J1","auto":0},{"p":"J2","s":"A5","auto":1},{"p":"J2","s":"A5","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"A4","auto":0},{"p":"A5","s":"A4","auto":0},{"p":"A5","s":"A4","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A2","s":"A4","auto":0},{"p":"A2","s":"A4","auto":1},{"p":"A2","s":"A4","auto":1},{"p":"A2","s":"A4","auto":1}],[{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"A5","auto":1},{"p":"J2","s":"A5","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"A4","auto":1},{"p":"A5","s":"A4","auto":0},{"p":"A5","s":"A4","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":0},{"p":"A4","s":"A2","auto":1},{"p":"A4","s":"A2","auto":1},{"p":"A4","s":"A2","auto":1}],[{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"J3","auto":1},{"p":"J2","s":"A5","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":0},{"p":"A5","s":"A6","auto":0},{"p":"A5","s":"A6","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A4","s":"A6","auto":0},{"p":"A4","s":"A6","auto":0},{"p":"A4","s":"A6","auto":0},{"p":"A4","s":"A6","auto":1},{"p":"A4","s":"A6","auto":1},{"p":"A4","s":"A6","auto":1}],[{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"J3","auto":0},{"p":"J2","s":"J3","auto":1},{"p":"J2","s":"J3","auto":1},{"p":"A5","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":0},{"p":"A5","s":"A6","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A4","s":"A6","auto":0},{"p":"A4","s":"A6","auto":1},{"p":"A4","s":"A6","auto":1}],[{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1}],[{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1}],[{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":0},{"p":"A6","s":"A4","auto":0},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1}],[{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1}],[{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":0},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"J2","auto":1},{"p":"J3","s":"A5","auto":1},{"p":"A5","s":"A6","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A5","auto":1},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1},{"p":"A6","s":"A4","auto":1}]]};
+      DEFAULT_GRID.sails = ['J1','J2','J3','C0','A1.5','A2','A4','A5','A6'];
+
+      function load(key, fallback) {
+        try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+      }
+      function store(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+      }
+      const clone = o => JSON.parse(JSON.stringify(o));
+
+      let grid = load(GRID_KEY, null) || clone(DEFAULT_GRID);
+      let log = load(LOG_KEY, []);
+      let last = null;      // last calculated conditions
+      let editCell = null;  // [i, j] being edited
+
+      const colorOf = s => SAIL_COLORS[s] || '#e5e7eb';
+      const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+      function bandIndex(edges, v) {
+        if (v <= edges[0]) return 0;
+        for (let k = 0; k < edges.length - 1; k++) if (v < edges[k + 1]) return k;
+        return edges.length - 2;
+      }
+      function cellFor(tws, awa) {
+        return [bandIndex(grid.twsEdges, tws), bandIndex(grid.awaEdges, Math.abs(awa))];
+      }
+      const twsLabel = i => `${grid.twsEdges[i]}–${grid.twsEdges[i + 1]} kn`;
+      const awaLabel = j => `${grid.awaEdges[j]}–${grid.awaEdges[j + 1]}°`;
+
+      function logsInCell(i, j) {
+        return log.filter(e => {
+          const [a, b] = cellFor(e.tws, e.awa);
+          return a === i && b === j;
+        });
+      }
+      // Sail most often flown in a cell, ignoring entries marked over/underpowered
+      function loggedFavourite(i, j) {
+        const counts = {};
+        logsInCell(i, j).forEach(e => {
+          if (e.feel && e.feel !== 'right') return;
+          counts[e.sail] = (counts[e.sail] || 0) + 1;
+        });
+        const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+        return best ? { sail: best[0], count: best[1], counts } : null;
+      }
+      function disagrees(i, j) {
+        const fav = loggedFavourite(i, j);
+        return !!(fav && fav.sail !== grid.cells[i][j].p);
+      }
+
+      // ----- Recommendation -----
+      function renderRecommendation() {
+        const box = document.getElementById('sailRecommendations');
+        if (!last) { box.innerHTML = '<div class="muted">Calculate to see sail recommendations</div>'; return; }
+        const [i, j] = cellFor(last.tws, last.awa);
+        const c = grid.cells[i][j];
+        const choice = (rank, s) => s ? `
+          <div class="card choice" style="margin-bottom:8px; border-left:6px solid ${colorOf(s)};">
+            <div class="rank">${rank}</div><div class="sail">${esc(s)}</div>
+          </div>` : '';
+        let html = choice('1st choice', c.p) + choice('2nd choice', c.s);
+        html += `<div class="hint">TWS ${twsLabel(i)}, AWA ${awaLabel(j)}</div>`;
+
+        // What changes if the wind moves into the next band
+        const nb = [];
+        if (i + 1 < grid.cells.length && grid.cells[i + 1][j].p !== c.p) nb.push(`above ${grid.twsEdges[i + 1]} kn: ${esc(grid.cells[i + 1][j].p)}`);
+        if (i > 0 && grid.cells[i - 1][j].p !== c.p) nb.push(`below ${grid.twsEdges[i]} kn: ${esc(grid.cells[i - 1][j].p)}`);
+        if (j + 1 < grid.cells[i].length && grid.cells[i][j + 1].p !== c.p) nb.push(`AWA above ${grid.awaEdges[j + 1]}°: ${esc(grid.cells[i][j + 1].p)}`);
+        if (j > 0 && grid.cells[i][j - 1].p !== c.p) nb.push(`AWA below ${grid.awaEdges[j]}°: ${esc(grid.cells[i][j - 1].p)}`);
+        if (nb.length) html += `<div class="hint">Changes to ${nb.join(' · ')}</div>`;
+
+        if (c.auto) html += `<div class="flag">This cell was estimated from neighbouring cells. Check it in the sail grid.</div>`;
+        const fav = loggedFavourite(i, j);
+        if (fav && fav.sail !== c.p) html += `<div class="flag">Your log has ${esc(fav.sail)} flown ${fav.count}× here.</div>`;
+        html += `<div class="btn-row"><button class="btn primary" id="logSailBtn">Log sail</button></div>`;
+        box.innerHTML = html;
+        document.getElementById('logSailBtn').onclick = openLogForm;
+      }
+
+      // ----- Grid table -----
+      function renderGrid() {
+        const cur = last ? cellFor(last.tws, last.awa) : null;
+        let h = '<table class="sailgrid"><thead><tr><th class="rowh">TWS \\ AWA</th>';
+        for (let j = 0; j < grid.awaEdges.length - 1; j++) h += `<th>${grid.awaEdges[j]}°</th>`;
+        h += '</tr></thead><tbody>';
+        for (let i = grid.cells.length - 1; i >= 0; i--) {
+          h += `<tr><th class="rowh">${grid.twsEdges[i]}–${grid.twsEdges[i + 1]}</th>`;
+          grid.cells[i].forEach((c, j) => {
+            const n = logsInCell(i, j).length;
+            const cls = [c.auto ? 'auto' : '', cur && cur[0] === i && cur[1] === j ? 'current' : '', disagrees(i, j) ? 'disagree' : ''].join(' ');
+            h += `<td class="${cls}" data-i="${i}" data-j="${j}" style="background-color:${colorOf(c.p)}">
+              <div class="p">${esc(c.p)}</div><div class="s">${esc(c.s)}</div>${n ? `<span class="n">${n}</span>` : ''}</td>`;
+          });
+          h += '</tr>';
+        }
+        h += '</tbody></table>';
+        document.getElementById('gridTable').innerHTML = h;
+        document.querySelectorAll('#gridTable td').forEach(td => td.onclick = () => openCellEditor(+td.dataset.i, +td.dataset.j));
+        document.getElementById('gridLegend').innerHTML = grid.sails.map(s => `<span style="background:${colorOf(s)}">${esc(s)}</span>`).join('');
+        const autoCount = grid.cells.flat().filter(c => c.auto).length;
+        document.getElementById('gridStatus').textContent = autoCount
+          ? `${autoCount} striped cells were estimated and still need checking. Orange borders mark cells where your log disagrees.`
+          : 'All cells checked. Orange borders mark cells where your log disagrees.';
+      }
+
+      const sailOptions = (sel, allowNone) =>
+        (allowNone ? `<option value="">— none —</option>` : '') +
+        grid.sails.map(s => `<option ${s === sel ? 'selected' : ''}>${esc(s)}</option>`).join('');
+
+      function openModal(html) {
+        document.getElementById('sgModalBody').innerHTML = html;
+        document.getElementById('sgModal').classList.add('open');
+      }
+      function closeModal() { document.getElementById('sgModal').classList.remove('open'); editCell = null; }
+
+      function openCellEditor(i, j) {
+        editCell = [i, j];
+        const c = grid.cells[i][j];
+        const fav = loggedFavourite(i, j);
+        const entries = logsInCell(i, j);
+        let logInfo = '<div class="muted" style="margin-top:10px">No logged sails in this cell yet.</div>';
+        if (entries.length) {
+          const tally = {};
+          entries.forEach(e => { const k = `${e.sail}${e.feel && e.feel !== 'right' ? ' (' + e.feel + ')' : ''}`; tally[k] = (tally[k] || 0) + 1; });
+          logInfo = `<div class="muted" style="margin-top:10px">Logged here: ${Object.entries(tally).map(([k, v]) => `${esc(k)} ×${v}`).join(', ')}</div>`;
+          if (fav && fav.sail !== c.p) logInfo += `<button class="btn" id="sgUseFav">Make ${esc(fav.sail)} 1st choice</button>`;
+        }
+        openModal(`
+          <h3>TWS ${twsLabel(i)} · AWA ${awaLabel(j)}</h3>
+          ${c.auto ? '<div class="flag">Estimated from neighbouring cells</div>' : ''}
+          <label>1st choice</label><select id="sgP">${sailOptions(c.p)}</select>
+          <label>2nd choice</label><select id="sgS">${sailOptions(c.s, true)}</select>
+          ${logInfo}
+          <div class="btn-row"><button class="btn" id="sgCancel">Cancel</button><button class="btn primary" id="sgSave">Save</button></div>`);
+        document.getElementById('sgCancel').onclick = closeModal;
+        document.getElementById('sgSave').onclick = () => {
+          const p = document.getElementById('sgP').value, s = document.getElementById('sgS').value;
+          grid.cells[i][j] = { p, s: s === p ? '' : s, auto: 0 };
+          saveGrid(); closeModal();
+        };
+        const useFav = document.getElementById('sgUseFav');
+        if (useFav) useFav.onclick = () => {
+          grid.cells[i][j] = { p: fav.sail, s: c.p, auto: 0 };
+          saveGrid(); closeModal();
+        };
+      }
+
+      function saveGrid() {
+        if (!store(GRID_KEY, grid)) alert('Could not save the sail grid on this device.');
+        renderGrid(); renderRecommendation();
+      }
+
+      // ----- Sail log -----
+      function getPosition() {
+        return new Promise(resolve => {
+          if (!navigator.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            p => resolve(p.coords),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 });
+        });
+      }
+
+      function openLogForm() {
+        if (!last) return;
+        const [i, j] = cellFor(last.tws, last.awa);
+        const c = grid.cells[i][j];
+        openModal(`
+          <h3>Log sail</h3>
+          <div class="muted">Time, position, course and speed are read from this phone when you save.</div>
+          <label>Sail flown</label><select id="lgSail">${sailOptions(c.p)}</select>
+          <div class="row">
+            <div><label>TWS (kn)</label><input id="lgTws" type="number" step="0.1" inputmode="decimal" value="${last.tws}"></div>
+            <div><label>TWD (deg true, FROM)</label><input id="lgTwd" type="number" step="1" inputmode="decimal" value="${last.twd}"></div>
+          </div>
+          <label>How did it feel? (optional)</label>
+          <div class="seg">
+            <label><input type="radio" name="lgFeel" value="under"><span>Under-powered</span></label>
+            <label><input type="radio" name="lgFeel" value="right"><span>Right</span></label>
+            <label><input type="radio" name="lgFeel" value="over"><span>Over-powered</span></label>
+          </div>
+          <label>Note (optional)</label><textarea id="lgNote" rows="2"></textarea>
+          <div id="lgStatus" class="muted" style="margin-top:8px"></div>
+          <div class="btn-row"><button class="btn" id="lgCancel">Cancel</button><button class="btn primary" id="lgSave">Save log entry</button></div>`);
+        document.getElementById('lgCancel').onclick = closeModal;
+        document.getElementById('lgSave').onclick = saveLogEntry;
+      }
+
+      async function saveLogEntry() {
+        const saveBtn = document.getElementById('lgSave');
+        saveBtn.disabled = true;
+        document.getElementById('lgStatus').textContent = 'Getting position…';
+        const tws = Number(document.getElementById('lgTws').value);
+        const twd = Number(document.getElementById('lgTwd').value);
+        const sail = document.getElementById('lgSail').value;
+        const feelEl = document.querySelector('input[name="lgFeel"]:checked');
+        const pos = await getPosition();
+
+        // Prefer the phone's course over ground when moving; otherwise the course used in the calculation
+        const cog = pos && pos.heading != null && !isNaN(pos.heading) && pos.speed > 0.5 ? pos.heading : null;
+        const sog = pos && pos.speed != null ? pos.speed * 1.943844 : null;
+        const course = cog != null ? cog : last.bearing;
+        const w = window.AWACalc.windFor(twd, tws, course);
+
+        const rec = grid.cells[cellFor(tws, w.awa)[0]][cellFor(tws, w.awa)[1]];
+        log.push({
+          time: new Date().toISOString(),
+          lat: pos ? +pos.latitude.toFixed(6) : null,
+          lon: pos ? +pos.longitude.toFixed(6) : null,
+          cog: cog != null ? +cog.toFixed(0) : null,
+          sog: sog != null ? +sog.toFixed(1) : null,
+          course: +course.toFixed(0),
+          courseSource: cog != null ? 'GPS' : last.courseSource,
+          twd, tws,
+          twa: +w.twa.toFixed(0), awa: +w.awa.toFixed(0), aws: +w.aws.toFixed(1),
+          sail, feel: feelEl ? feelEl.value : '',
+          rec1: rec.p, rec2: rec.s,
+          note: document.getElementById('lgNote').value.trim()
+        });
+        if (!store(LOG_KEY, log)) alert('Could not save the log on this device. Export your log to keep it.');
+        closeModal();
+        renderLog(); renderGrid(); renderRecommendation();
+      }
+
+      function renderLog() {
+        document.getElementById('logCount').textContent = log.length
+          ? `${log.length} entr${log.length === 1 ? 'y' : 'ies'} saved on this device.` : 'No entries yet.';
+        document.getElementById('logList').innerHTML = log.slice(-5).reverse().map(e => `
+          <div class="card">
+            <b>${esc(e.sail)}</b> ${e.feel && e.feel !== 'right' ? `<span class="warning">(${e.feel}-powered)</span>` : ''}
+            · TWS ${e.tws} kn · AWA ${e.awa}° · ${new Date(e.time).toLocaleString()}
+            ${e.note ? `<div class="muted">${esc(e.note)}</div>` : ''}
+          </div>`).join('');
+      }
+
+      function download(name, text, type) {
+        const blob = new Blob([text], { type });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+      function exportCsv() {
+        const cols = ['time','lat','lon','cog','sog','course','courseSource','twd','tws','twa','awa','aws','sail','feel','rec1','rec2','note'];
+        const q = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+        const csv = [cols.join(',')].concat(log.map(e => cols.map(k => q(e[k])).join(','))).join('\n');
+        download(`sail-log-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv');
+      }
+      function importGrid(file) {
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const g = JSON.parse(r.result);
+            if (!g.twsEdges || !g.awaEdges || !g.cells) throw new Error('not a sail grid');
+            grid = g; if (!grid.sails) grid.sails = DEFAULT_GRID.sails.slice();
+            saveGrid();
+          } catch (e) { alert('That file is not a sail grid export.'); }
+        };
+        r.readAsText(file);
+      }
+
+      // ----- Wiring -----
+      window.SailGrid = {
+        onCalculate(cond) { last = cond; renderRecommendation(); renderGrid(); }
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('sgModal').addEventListener('click', e => { if (e.target.id === 'sgModal') closeModal(); });
+        document.getElementById('exportLog').onclick = exportCsv;
+        document.getElementById('clearLog').onclick = () => {
+          if (log.length && confirm('Delete all logged sail entries from this device? Export first if you want to keep them.')) {
+            log = []; store(LOG_KEY, log); renderLog(); renderGrid(); renderRecommendation();
+          }
+        };
+        document.getElementById('exportGrid').onclick = () => download('sail-grid.json', JSON.stringify(grid, null, 1), 'application/json');
+        document.getElementById('importGrid').onclick = () => document.getElementById('importGridFile').click();
+        document.getElementById('importGridFile').onchange = e => { if (e.target.files[0]) importGrid(e.target.files[0]); e.target.value = ''; };
+        document.getElementById('addSail').onclick = () => {
+          const name = (prompt('New sail name (e.g. A3)') || '').trim();
+          if (name && !grid.sails.includes(name)) { grid.sails.push(name); saveGrid(); }
+        };
+        document.getElementById('resetGrid').onclick = () => {
+          if (confirm('Reset the sail grid to the original estimates? Your edits will be lost (your log is kept).')) {
+            grid = clone(DEFAULT_GRID); saveGrid();
+          }
+        };
+        renderGrid(); renderLog();
+      });
+    })();
 
     // Service Worker Registration
     if ('serviceWorker' in navigator) {
