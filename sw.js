@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awa-calc-v7';
+const CACHE_NAME = 'awa-calc-v8';
 const urlsToCache = [
   '/',
   '/index.html',
